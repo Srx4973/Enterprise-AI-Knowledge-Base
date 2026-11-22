@@ -1,9 +1,9 @@
 import os
 import shutil
 from typing import List
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from celery.result import AsyncResult
 
 # 导入核心组件
@@ -17,7 +17,6 @@ router = APIRouter()
 # 创建存放上传文件的临时目录
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 
 # ================= 1. 文档上传与入库接口 =================
 @router.post("/upload")
@@ -62,7 +61,7 @@ async def get_task_status(task_id: str):
 # ================= 3. 问答请求模型 =================
 class AskRequest(BaseModel):
     question: str
-
+    session_id: str = "default_user"
 
 # ================= 4. 纯 RAG 流式问答接口 =================
 @router.post("/chat/rag")
@@ -75,4 +74,4 @@ async def rag_chat_api(req: AskRequest):
 @router.post("/chat/agent")
 async def agent_chat_api(req: AskRequest):
     """带意图识别和工具调用的 Agent 问答"""
-    return StreamingResponse(ask_agent_stream(req.question), media_type="text/event-stream")
+    return StreamingResponse(ask_agent_stream(req.question,req.session_id), media_type="text/event-stream")

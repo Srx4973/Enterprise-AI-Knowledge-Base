@@ -2,8 +2,10 @@
 【FastAPI 启动入口】
 负责初始化应用、配置跨域中间件、挂载路由。
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from app.api.routes import router
 
 # 初始化 FastAPI
@@ -26,7 +28,12 @@ app.add_middleware(
 # 挂载路由（统一加 /api 前缀）
 app.include_router(router, prefix="/api")
 
-@app.get("/")
+@app.get("/health")
 def health_check():
     """健康检查接口"""
     return {"status": "ok", "message": "Backend is running!"}
+
+@app.get("/")
+def index():
+    file_path = os.path.join(os.path.dirname(__file__), "../frontend/index.html")
+    return FileResponse(file_path)

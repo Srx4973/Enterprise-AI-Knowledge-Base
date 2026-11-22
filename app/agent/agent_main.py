@@ -1,6 +1,7 @@
 import json
 import time
 import requests
+from ..core.memory import get_history, save_history
 from ..core.config import DEEPSEEK_API_KEY, MODEL_NAME, DEEPSEEK_URL
 from .tools import get_weather, calculate, search_documents, agent_tools,list_all_documents
 
@@ -30,11 +31,16 @@ def safe_request_llm(data, max_retries=3, wait_time=10):
 
 
 # ---------- Agent 核心逻辑 ----------
-def ask_agent_stream(question: str):
+def ask_agent_stream(question: str,session_id: str = "default"):
+    # 1. 获取历史记忆
+    history = get_history(session_id)
+
+    # 2. 组装本次请求的 messages
+    messages = history.copy()  # 浅拷贝历史记录
     messages = [{"role": "user", "content": question}]
     data = {"model": MODEL_NAME, "messages": messages, "tools": agent_tools, "temperature": 0.1}
 
-    # 1. 判定意图
+    # 3. 判定意图
     response_data = safe_request_llm(data)
     if not response_data:
         yield "data: [SYS] 系统繁忙，请稍后再试。\n\n"
@@ -42,7 +48,7 @@ def ask_agent_stream(question: str):
 
     message = response_data["choices"][0]["message"]
 
-    # 2. 如果调用工具
+    # 4. 如果调用工具
     if "tool_calls" in message:
         yield "data: [SYS] 正在调用工具...\n\n"
         messages.append(message)
@@ -71,7 +77,9 @@ def ask_agent_stream(question: str):
     #最终请求不能再带 tools 字段
     data.pop("tools", None)
 
-    # 3. 流式生成最终回答
+    # 5. 流式生成最终回答
+    full_answer = ""  # 用来记录最终完整的回答，存入记忆
+
     data["stream"] = True
     max_stream_retries = 3
     for attempt in range(max_stream_retries):
@@ -93,10 +101,18 @@ def ask_agent_stream(question: str):
                         chunk = json.loads(json_str)
                         delta = chunk["choices"][0]["delta"].get("content", "")
                         if delta:
+                            full_answer += delta
                             safe = delta.replace("\n", "\ndata: ")
                             yield f"data: {safe}\n\n"
                     except:
                         continue
+            # 6. 流式输出完成后，更新记忆
+            # 注意：只存 user 和 assistant 的纯文本，不存复杂的 tool_calls，省 Token
+            if full_answer:
+                history.append({"role": "user", "content": question})
+                history.append({"role": "assistant", "content": full_answer})
+                save_history(session_id, history)
+
             break  # 成功执行完流，退出重试
         except Exception as e:
             if attempt == max_stream_retries - 1:

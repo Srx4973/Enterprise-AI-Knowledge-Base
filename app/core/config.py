@@ -26,14 +26,20 @@ EMBEDDING_URL  = "https://api.siliconflow.cn/v1/embeddings"
 RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 RERANK_URL = "https://api.siliconflow.cn/v1/rerank"
 
-
+#分块参数
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 120
 MIN_CHUNK_SIZE = 10
 TABLE_EXTENSIONS = {".csv", ".xlsx", ".xls"}
 
+#分步任务
 celery_app = Celery(
     "worker",
     broker="redis://localhost:6379/0",
     backend="redis://localhost:6379/1",
 )
+
+# 配置 Redis 用于记忆存储
+REDIS_HOST = "localhost"
+REDIS_PORT = 6379
+REDIS_DB_MEMORY = 2  # 用 2 号库专门存聊天记录

@@ -1,0 +1,39 @@
+"""
+【全局配置模块】
+负责加载环境变量、初始化 Celery 实例，以及维护全局常量。
+"""
+import os
+from celery import Celery
+from dotenv import load_dotenv
+
+load_dotenv()
+#向量库
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CHROMA_PATH = os.path.join(BASE_DIR, "../chroma_db_online")
+CHROMA_COLLECTION = "pdf_docs"
+
+#api配置
+# 大模型（生成）的配置
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+MODEL_NAME = "qiniu/conatus-free"
+DEEPSEEK_URL = "https://api.qnaigc.com/v1/chat/completions"
+
+# 向量模型（检索）的配置
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
+EMBEDDING_MODEL = "BAAI/bge-m3"
+EMBEDDING_URL  = "https://api.siliconflow.cn/v1/embeddings"
+#重排配置
+RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
+RERANK_URL = "https://api.siliconflow.cn/v1/rerank"
+
+
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 120
+MIN_CHUNK_SIZE = 10
+TABLE_EXTENSIONS = {".csv", ".xlsx", ".xls"}
+
+celery_app = Celery(
+    "worker",
+    broker="redis://localhost:6379/0",
+    backend="redis://localhost:6379/1",
+)

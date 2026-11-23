@@ -1,370 +1,264 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise AI 知识库</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; }
+  .container { width: 100%; max-width: 900px; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); overflow: hidden; }
+  .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; text-align: center; }
+  h2 { color: white; font-weight: 600; font-size: 24px; }
+  .subtitle { color: rgba(255, 255, 255, 0.85); font-size: 14px; margin-top: 8px; }
+  .content { padding: 25px; }
 
-    <meta charset="UTF-8">
-    Enterprise AI 知识库</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  /* 上传区 */
+  #uploadTipContainer { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .upload-tip { background: #f8f9fa; padding: 14px 18px; border-radius: 12px; border: 1px solid #e9ecef; display: flex; align-items: center; gap: 12px; transition: all 0.3s ease; }
+  .upload-tip span:first-child { font-size: 14px; color: #495057; min-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .upload-tip progress { flex: 1; height: 8px; border-radius: 4px; border: none; }
+  .upload-tip progress::-webkit-progress-bar { background: #e9ecef; border-radius: 4px; }
+  .upload-tip progress::-webkit-progress-value { background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 4px; transition: width 0.3s ease; }
+  .upload-status { font-size: 13px; color: #6c757d; min-width: 120px; text-align: right; }
 
-        body {
-            font-family: -apple-system, sans-serif;
-            max-width: 850px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #f7f9fc;
-        }
-        h2 {
-            text-align: center;
-            color: #2c3e50;
-        }
+  /* 聊天区 */
+  #chatBox { min-height: 450px; max-height: 600px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; margin-bottom: 25px; padding: 20px; background: #f8f9fa; border-radius: 16px; border: 1px solid #e9ecef; }
+  #chatBox::-webkit-scrollbar { width: 6px; }
+  #chatBox::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+  .message { padding: 14px 18px; border-radius: 16px; max-width: 75%; line-height: 1.7; font-size: 15px; word-wrap: break-word; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .msg-user { align-self: flex-end; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+  .msg-ai { align-self: flex-start; background: white; color: #2c3e50; border: 1px solid #e9ecef; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
+  .msg-ai pre { background: #f8f9fa; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
+  .msg-ai code { font-family: Consolas, monospace; font-size: 14px; }
 
-        /* 聊天区 */
-        .chat-container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .message {
-            padding: 15px;
-            border-radius: 8px;
-            max-width: 85%;
-            line-height: 1.6;
-        }
-        .msg-user {
-            align-self: flex-end;
-            background-color: #3498db;
-            color: white;
-        }
-        .msg-ai {
-            align-self: flex-start;
-            background-color: white;
-            border: 1px solid #dce1e8;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        #chatBox {
-            min-height: 300px;
-            max-height: 600px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
+  /* 系统状态 */
+  .sys-status { font-size: 13px; color: #e67e22; background: #fff3cd; padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #e67e22; }
 
-        /* 系统状态 */
-        .sys-status {
-            font-size: 12px;
-            color: #e67e22;
-            background: #fdf3e8;
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            border-left: 3px solid #e67e22;
-        }
-
-        /* 输入区 */
-        .input-area {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        /* 隐藏原生的文件选择input */
-        #fileInput {
-            display: none;
-        }
-        .upload-icon-btn {
-            width: 44px;
-            height: 44px;
-            font-size: 24px;
-            border-radius: 8px;
-            background-color: #ecf0f1;
-            color: #2c3e50;
-            border: 1px solid #dce1e8;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-        .upload-icon-btn:hover {
-            background-color: #3498db;
-            color: white;
-        }
-        .upload-icon-btn:active {
-            transform: scale(0.98);
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 14px 18px;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
-            outline: none;
-            font-size: 15px;
-            transition: all 0.2s ease;
-            background: white;
-        }
-        input[type="text"]:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        button {
-            padding: 14px 28px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s ease;
-        }
-        button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-        }
-        button:disabled {
-            background: #95a5a6;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        /* 上传进度提示条 */
-        .upload-tip {
-            background: white;
-            padding: 12px 15px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            border: 1px solid #e9ecef;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: all 0.3s ease;
-        }
-        .upload-tip:hover {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-        .upload-tip span:first-child {
-            font-size: 14px;
-            color: #495057;
-            min-width: 180px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .upload-tip progress {
-            flex: 1;
-            height: 8px;
-            border-radius: 4px;
-            overflow: hidden;
-            border: none;
-        }
-        .upload-tip progress::-webkit-progress-bar {
-            background-color: #e9ecef;
-            border-radius: 4px;
-        }
-        .upload-tip progress::-webkit-progress-value {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-        .upload-status {
-            font-size: 13px;
-            min-width: 100px;
-            text-align: right;
-        }
-    </style>
+  /* 输入区 */
+  .input-area { display: flex; gap: 12px; align-items: center; padding: 15px; background: #f8f9fa; border-radius: 16px; border: 1px solid #e9ecef; }
+  #fileInput { display: none; }
+  .upload-icon-btn { width: 48px; height: 48px; font-size: 28px; border-radius: 12px; background-color: white; color: #667eea; border: 1px solid #e9ecef; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; flex-shrink: 0; }
+  .upload-icon-btn:hover { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; transform: scale(1.05); }
+  select { padding: 14px; border: 1px solid #e9ecef; border-radius: 12px; outline: none; background: white; font-weight: bold; color: #667eea; cursor: pointer; }
+  input[type="text"] { flex: 1; padding: 14px 18px; border: 1px solid #e9ecef; border-radius: 12px; outline: none; font-size: 15px; background: white; }
+  input[type="text"]:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+  #sendBtn { padding: 14px 28px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 15px; flex-shrink: 0; }
+  #sendBtn:disabled { background: #95a5a6; cursor: not-allowed; }
+</style>
 </head>
+<body>
 
-    📁 企业级 AI 知识库</h2>
+<div class="container">
+  <div class="header">
+    <h2>📁 企业级 AI 知识库</h2>
+    <div class="subtitle">支持批量上传PDF/Word/Excel/Text文档，智能问答</div>
+  </div>
 
-    <!-- 上传进度提示容器，动态插入 -->
+  <div class="content">
+    <!-- 上传进度提示容器 -->
     <div id="uploadTipContainer"></div>
 
     <!-- 聊天区 -->
     <div id="chatBox">
-        <div class="message msg-ai">你好！点击左侧加号按钮上传文档，或者直接向我提问。支持格式：PDF、TXT、DOCX、CSV、XLSX</small></div>
+      <div class="message msg-ai">你好！点击左侧加号按钮批量上传文档，或者直接向我提问。<br><small style="color: #6c757d;">支持格式：.pdf .txt .docx .csv .xlsx .xls</small></div>
     </div>
 
     <!-- 输入区 -->
     <div class="input-area">
-        <!-- 隐藏的原生文件选择控件 -->
-        <input type="file" id="fileInput" accept=".pdf,.txt,.docx,.csv,.xlsx,.xls" multiple>
-        <!-- 加号上传按钮 -->
-        <div class="upload-icon-btn" onclick="document.getElementById('fileInput').click()">+</div>
-        <input type="text" id="question" placeholder="输入你的问题..." onkeypress="if(event.key==='Enter') ask()">
-        <button id="sendBtn" onclick="ask()">发送</button>
+      <input type="file" id="fileInput" accept=".pdf,.txt,.docx,.csv,.xlsx,.xls" multiple>
+      <div class="upload-icon-btn" title="上传文件" onclick="document.getElementById('fileInput').click()">+</div>
+
+      <!-- 模式切换 -->
+      <select id="chatMode">
+        <option value="agent">🤖 Agent 模式</option>
+        <option value="rag">📚 纯 RAG 模式</option>
+      </select>
+
+      <input type="text" id="question" placeholder="输入你的问题..." onkeypress="if(event.key==='Enter') ask()">
+      <button id="sendBtn" onclick="ask()">发送</button>
     </div>
+  </div>
+</div>
 
+<script>
+// 先从浏览器缓存拿，拿不到才生成新的
+let SESSION_ID = localStorage.getItem("chat_session_id");
+if (!SESSION_ID) {
+    SESSION_ID = "user_" + Math.random().toString(36).substring(7);
+    localStorage.setItem("chat_session_id", SESSION_ID);
+}
+const chatBox = document.getElementById('chatBox');
+const fileInput = document.getElementById('fileInput');
+const sendBtn = document.getElementById('sendBtn');
+const questionInput = document.getElementById('question');
 
-        const SESSION_ID = "user_" + Math.random().toString(36).substring(7);
-        const chatBox = document.getElementById('chatBox');
-        const fileInput = document.getElementById('fileInput');
-        const sendBtn = document.getElementById('sendBtn');
+// ================= 1. 文件批量上传逻辑 =================
+fileInput.addEventListener('change', async function() {
+  const files = this.files;
+  if (files.length === 0) return;
 
-        // 页面加载完成后聚焦输入框
-        window.onload = function() {
-            document.getElementById('question').focus();
-        }
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file); // 匹配后端的 files
+  }
 
-        // 绑定文件选择后的自动上传逻辑
-        fileInput.addEventListener('change', async function() {
-            const files = this.files;
-            if (files.length === 0) return;
+  // 创建批量上传进度提示
+  const progressMap = new Map();
+  for (const file of files) {
+    const tipDiv = document.createElement('div');
+    tipDiv.className = 'upload-tip';
+    tipDiv.innerHTML = `
+      <span title="${file.name}">📄 ${file.name}</span>
+      <progress value="0" max="100"></progress>
+      <span class="upload-status">等待上传...</span>
+    `;
+    document.getElementById('uploadTipContainer').appendChild(tipDiv);
+    progressMap.set(file.name, {
+      bar: tipDiv.querySelector('progress'),
+      text: tipDiv.querySelector('.upload-status'),
+      div: tipDiv
+    });
+  }
 
-            // 所有文件打包到同一个FormData，匹配后端List参数
-            const formData = new FormData();
-            for (const file of files) {
-                formData.append("files", file); // 注意参数名是files（复数），和后端一致
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json();
+
+    // 为每个任务启动进度轮询
+    data.tasks.forEach(taskInfo => {
+      const item = progressMap.get(taskInfo.filename);
+      if (!item) return;
+
+      item.text.innerText = "解析中...";
+      const timer = setInterval(async () => {
+        try {
+            const taskRes = await fetch(`/api/task/${taskInfo.task_id}`);
+            const taskData = await taskRes.json();
+
+            if (taskData.state === 'PROGRESS') {
+              item.bar.value = taskData.progress || 0;
+              item.text.innerText = `${taskData.message || '处理中'} (${taskData.progress || 0}%)`;
+            } else if (taskData.state === 'SUCCESS') {
+              clearInterval(timer);
+              item.bar.value = 100;
+              item.text.innerText = "✅ 完成";
+              item.div.style.background = '#f8fff9';
+              item.div.style.borderColor = '#d4edda';
+              setTimeout(() => item.div.remove(), 3000);
+            } else if (taskData.state === 'FAILURE') {
+              clearInterval(timer);
+              item.text.innerText = "❌ 失败";
+              item.div.style.background = '#fff8f8';
+              item.div.style.borderColor = '#f8d7da';
             }
-
-            // 创建批量上传总提示
-            const totalTip = document.createElement('div');
-            totalTip.className = 'sys-status';
-            totalTip.innerText = `正在批量上传 ${files.length} 个文件...`;
-            document.getElementById('uploadTipContainer').appendChild(totalTip);
-
-            try {
-                // 一次请求发送所有文件
-                const res = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!res.ok) {
-                    throw new Error(`上传失败：HTTP ${res.status}`);
-                }
-
-                const data = await res.json();
-                if (data.status !== 'success' || !data.tasks) {
-                    throw new Error("上传返回数据格式错误");
-                }
-
-                totalTip.innerText = `✅ 全部文件上传成功，正在解析入库...`;
-                setTimeout(() => totalTip.remove(), 3000);
-
-                // 遍历每个任务，单独创建进度条轮询
-                data.tasks.forEach(taskInfo => {
-                    // 为当前文件创建专属的进度提示条
-                    const tipDiv = document.createElement('div');
-                    tipDiv.className = 'upload-tip';
-                    tipDiv.innerHTML = `
-                        ${taskInfo.filename}</span>
-                        <progress value="0" max="100"></progress>
-                        <span class="upload-status">解析中...</span>
-                    `;
-                    document.getElementById('uploadTipContainer').appendChild(tipDiv);
-
-                    const progressBar = tipDiv.querySelector('progress');
-                    const statusText = tipDiv.querySelector('.upload-status');
-
-                    // 轮询当前文件的解析进度
-                    const timer = setInterval(async () => {
-                        try {
-                            const taskRes = await fetch(`/api/task/${taskInfo.task_id}`);
-                            const taskData = await taskRes.json();
-
-                            if (taskData.state === 'PROGRESS') {
-                                progressBar.value = taskData.progress;
-                                statusText.innerText = `${taskData.progress}%`;
-                            } else if (taskData.state === 'SUCCESS') {
-                                clearInterval(timer);
-                                progressBar.value = 100;
-                                statusText.innerText = "✅ 完成";
-                                // 3秒后自动移除进度提示条
-                                setTimeout(() => tipDiv.remove(), 3000);
-                                // 添加系统消息
-                                addSystemMessage(`文档《${taskInfo.filename}》解析入库完成，可以开始提问了`);
-                            } else if (taskData.state === 'FAILURE') {
-                                clearInterval(timer);
-                                statusText.innerText = "❌ 失败";
-                                addSystemMessage(`文档《${taskInfo.filename}》解析失败：${taskData.error || '未知错误'}`);
-                            }
-                        } catch (err) {
-                            clearInterval(timer);
-                            statusText.innerText = "❌ 错误";
-                        }
-                    }, 1000);
-                });
-
-            } catch (err) {
-                totalTip.innerText = `❌ 上传失败：${err.message}`;
-                totalTip.style.color = '#e74c3c';
-                totalTip.style.background = '#fdf0ef';
-                totalTip.style.borderLeftColor = '#e74c3c';
-            }
-
-            // 清空文件选择，允许重复选择同一文件
-            fileInput.value = '';
-        })
-
-        // 提问函数
-        async function ask() {
-            const questionInput = document.getElementById('question');
-            const question = questionInput.value.trim();
-            if (!question) return;
-
-            // 禁用按钮防止重复提交
-            sendBtn.disabled = true;
-            questionInput.value = '';
-
-            // 添加用户消息
-            addUserMessage(question);
-
-            // 添加AI加载中消息
-            const loadingMsg = addAiMessage("正在思考中...");
-
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        question: question,
-                        session_id: SESSION_ID
-                    })
-                });
-
-                const data = await res.json();
-                // 渲染markdown回复
-                loadingMsg.innerHTML = marked.parse(data.answer || "抱歉，我没有理解你的问题");
-            } catch (err) {
-                loadingMsg.innerHTML = "❌ 请求失败：" + err.message;
-            } finally {
-                sendBtn.disabled = false;
-                questionInput.focus();
-                // 滚动到底部
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
+        } catch(e) {
+            clearInterval(timer);
         }
+      }, 1500);
+    });
+  } catch (err) {
+    alert("上传失败：" + err.message);
+    // 清除失败的进度条
+    progressMap.forEach(item => item.div.remove());
+  } finally {
+    fileInput.value = ''; // 清空以便下次选择
+  }
+});
 
-        // 添加用户消息
-        function addUserMessage(content) {
-            const div = document.createElement('div');
-            div.className = 'message msg-user';
-            div.innerText = content;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            return div;
-        }
+// ================= 2. 问答逻辑 (流式解析 + 模式切换) =================
+function addMessage(content, isUser = false) {
+  const div = document.createElement('div');
+  div.className = `message ${isUser ? 'msg-user' : 'msg-ai'}`;
+  div.innerHTML = isUser ? content : marked.parse(content);
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return div;
+}
 
-        // 添加AI消息
-        function addAiMessage(content) {
-            const div = document.createElement('div');
-            div.className = 'message msg-ai';
-            div.innerText = content;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            return div;
-        }
+async function ask() {
+  const question = questionInput.value.trim();
+  const mode = document.getElementById('chatMode').value;
+  if (!question) return;
 
-        // 添加系统消息
-        function addSystemMessage(content) {
-            const div = document.createElement('div');
-            div.className = 'sys-status';
-            div.innerText = content;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
+  sendBtn.disabled = true;
+  questionInput.disabled = true;
+
+  addMessage(question, true);
+  questionInput.value = '';
+
+  // 创建 AI 消息框
+  const aiDiv = addMessage("思考中...");
+  let fullText = "";
+  let sysHtml = "";
+
+  try {
+    // 根据模式切换请求的接口
+    const apiUrl = mode === 'agent' ? '/api/chat/agent' : '/api/chat/rag';
+
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: SESSION_ID, question: question })
+    });
+
+    if (!res.ok) throw new Error("请求后端接口失败");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      let parts = buffer.split('\n\n');
+      buffer = parts.pop();
+
+      for (let part of parts) {
+        if (part.startsWith('data: ')) {
+          let text = part.substring(6).replace(/\ndata: /g, "\n");
+          if (text === '[DONE]') continue;
+
+          if (text.startsWith('[SYS]')) {
+            sysHtml += `<div class="sys-status">${text.replace('[SYS] ', '')}</div>`;
+          } else {
+            // 过滤可能的乱码标签
+            text = text.replace(/<\s*\|.*?DSML.*?\|.*?>/gs, "");
+            fullText += text;
+          }
+
+          // 实时渲染
+          aiDiv.innerHTML = sysHtml + (fullText ? marked.parse(fullText) : "思考中...");
+          chatBox.scrollTop = chatBox.scrollHeight;
         }
-    </script>
+      }
+    }
+
+    // 如果模型完全没生成文本
+    if (!fullText && sysHtml) {
+      aiDiv.innerHTML = sysHtml + `<div style="color:#e74c3c; margin-top:10px;">⚠️ 生成最终文本失败，请检查模型状态。</div>`;
+    } else if (!fullText && !sysHtml) {
+      aiDiv.innerHTML = "抱歉，我没有理解你的问题。";
+    }
+
+  } catch (err) {
+    aiDiv.innerHTML = `<span style="color:red">❌ 请求出错：${err.message}</span>`;
+  } finally {
+    sendBtn.disabled = false;
+    questionInput.disabled = false;
+    questionInput.focus();
+  }
+}
+</script>
+
 </body>
 </html>

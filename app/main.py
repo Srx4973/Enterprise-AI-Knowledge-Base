@@ -16,10 +16,10 @@ app = FastAPI(
 )
 
 # 配置 CORS（跨域资源共享）
-# 因为你的前端可能运行在 8080 端口，后端在 8000 端口，不加这个前端会报错
+# 因为前端可能运行在 8080 端口，后端在 8000 端口，不加这个前端会报错
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境建议改成前端的具体地址，如 ["http://localhost:3000"]
+    allow_origins=["*"],  # 生产环境建议改成前端的具体地址
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

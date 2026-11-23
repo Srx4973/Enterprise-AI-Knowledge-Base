@@ -72,10 +72,10 @@ def build_context_and_prompt(question: str):
     for i, (doc, meta) in enumerate(zip(final_docs, final_metas)):
         location = meta.get('location', '未知')
         context_parts.append(f"[片段{i + 1}] {doc}")
-        source_info.append(f"片段{i + 1} 来自第 {location} 页")
+        source_info.append(f"片段{i + 1} 来自{location} ")
 
     context = "\n\n".join(context_parts)
-    sources = "\n".join(source_info)
+
 
     prompt = f"""请基于以下上下文回答问题。如果上下文不包含相关信息，请说“根据当前文档无法回答”。
 
@@ -84,4 +84,4 @@ def build_context_and_prompt(question: str):
 
 问题：{question}
 回答："""
-    return prompt, sources
+    return prompt, source_info

@@ -37,7 +37,7 @@ def ask_agent_stream(question: str,session_id: str = "default"):
 
     # 2. 组装本次请求的 messages
     messages = history.copy()  # 浅拷贝历史记录
-    messages = [{"role": "user", "content": question}]
+    messages.append({"role": "user", "content": question})
     data = {"model": MODEL_NAME, "messages": messages, "tools": agent_tools, "temperature": 0.1}
 
     # 3. 判定意图

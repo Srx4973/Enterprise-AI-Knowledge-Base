@@ -3,7 +3,7 @@ import shutil
 from typing import List
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse
 from celery.result import AsyncResult
 
 # 导入核心组件
@@ -67,7 +67,7 @@ class AskRequest(BaseModel):
 @router.post("/chat/rag")
 async def rag_chat_api(req: AskRequest):
     """不带工具调用的纯 RAG 问答，直接返回流式响应"""
-    return StreamingResponse(ask_question_stream(req.question), media_type="text/event-stream")
+    return StreamingResponse(ask_question_stream(req.question,req.session_id), media_type="text/event-stream")
 
 
 # ================= 5. Agent 流式问答接口 (带工具调用) =================

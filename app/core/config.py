@@ -15,8 +15,8 @@ CHROMA_COLLECTION = "pdf_docs"
 #api配置
 # 大模型（生成）的配置
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-MODEL_NAME = "qiniu/conatus-free"
-DEEPSEEK_URL = "https://api.qnaigc.com/v1/chat/completions"
+MODEL_NAME = "GLM-4-Flash-250414"
+DEEPSEEK_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
 # 向量模型（检索）的配置
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")

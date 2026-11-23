@@ -3,10 +3,11 @@ import json
 import requests
 from .retriever import build_context_and_prompt
 from ..core.config import DEEPSEEK_API_KEY,MODEL_NAME,DEEPSEEK_URL
+from ..core.memory import get_history, save_history
 
 
 # -----------流式问答函数---------------
-def ask_question_stream(question: str):
+def ask_question_stream(question: str,session_id: str = "default"):
     # 1. 异常兜底
     try:
         prompt, source_info = build_context_and_prompt(question)
@@ -15,10 +16,16 @@ def ask_question_stream(question: str):
         yield "data: 检索服务暂时不可用，请稍后再试。\n\n"
         return
 
-    # 2. 空结果兜底
+    #  空结果兜底
     if not prompt:
         yield "data: 根据当前文档无法回答。\n\n"
         return
+
+    # 2. 组装历史记忆
+    history = get_history(session_id)
+    messages = history.copy()
+    # 把检索到的上下文和当前问题拼在一起，作为最新的一句话发给大模型
+    messages.append({"role": "user", "content": prompt})
 
     # 3. 调用大模型 API
     headers = {
@@ -27,7 +34,7 @@ def ask_question_stream(question: str):
     }
     data = {
         "model": MODEL_NAME,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "temperature": 0.3,
         "max_tokens": 500,
         "stream": True
@@ -95,7 +102,13 @@ def ask_question_stream(question: str):
     if "根据当前文档无法回答" in full_answer:
         return
 
-    # 6. 只有真正回答了，才拼接参考来源
-    source_text = "\n\n参考来源：\n" + "\n".join(source_info)
+    # 6.保存记忆
+    if full_answer:
+        history.append({"role": "user", "content": question})
+        history.append({"role": "assistant", "content": full_answer})
+        save_history(session_id, history)
+
+    # 7. 只有真正回答了，才拼接参考来源
+    source_text = "\n\n参考来源：\n\n" + "\n\n".join(source_info)
     safe_sources = source_text.replace("\n", "\ndata: ")
     yield f"data: {safe_sources}\n\n"

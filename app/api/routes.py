@@ -66,12 +66,15 @@ class AskRequest(BaseModel):
 # ================= 4. 纯 RAG 流式问答接口 =================
 @router.post("/chat/rag")
 async def rag_chat_api(req: AskRequest):
-    """不带工具调用的纯 RAG 问答，直接返回流式响应"""
-    return StreamingResponse(ask_question_stream(req.question,req.session_id), media_type="text/event-stream")
+    """带记忆和精确用户问题的 RAG 问答"""
+    # 加上 rag_ 前缀，让 RAG 模式拥有独立的历史记忆
+    isolated_session_id = f"rag_{req.session_id}"
+    return StreamingResponse(ask_question_stream(req.question,isolated_session_id), media_type="text/event-stream")
 
 
 # ================= 5. Agent 流式问答接口 (带工具调用) =================
 @router.post("/chat/agent")
 async def agent_chat_api(req: AskRequest):
     """带意图识别和工具调用的 Agent 问答"""
-    return StreamingResponse(ask_agent_stream(req.question,req.session_id), media_type="text/event-stream")
+    isolated_session_id = f"agent_{req.session_id}"
+    return StreamingResponse(ask_agent_stream(req.question,isolated_session_id), media_type="text/event-stream")

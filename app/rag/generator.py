@@ -1,16 +1,19 @@
 import time
 import json
 import requests
-from .retriever import build_context_and_prompt
+from .retriever import build_context_and_prompt,rewrite_query
 from ..core.config import DEEPSEEK_API_KEY,MODEL_NAME,DEEPSEEK_URL
 from ..core.memory import get_history, save_history
 
 
 # -----------流式问答函数---------------
 def ask_question_stream(question: str,session_id: str = "default"):
-    # 1. 异常兜底
+    # 1. 结合历史，先改写用户问题（解决“它是什么”的问题）
+    optimized_query = rewrite_query(question, session_id)
+
+    # 2. 异常兜底
     try:
-        prompt, source_info = build_context_and_prompt(question)
+        prompt, source_info = build_context_and_prompt(optimized_query)
     except Exception as e:
         print(f"检索阶段异常: {e}")
         yield "data: 检索服务暂时不可用，请稍后再试。\n\n"
@@ -21,13 +24,13 @@ def ask_question_stream(question: str,session_id: str = "default"):
         yield "data: 根据当前文档无法回答。\n\n"
         return
 
-    # 2. 组装历史记忆
+    # 3. 组装历史记忆
     history = get_history(session_id)
     messages = history.copy()
-    # 把检索到的上下文和当前问题拼在一起，作为最新的一句话发给大模型
+    # 把检索到的记忆和当前问题拼在一起，作为最新的一句话发给大模型
     messages.append({"role": "user", "content": prompt})
 
-    # 3. 调用大模型 API
+    # 4. 调用大模型 API
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
@@ -36,7 +39,7 @@ def ask_question_stream(question: str,session_id: str = "default"):
         "model": MODEL_NAME,
         "messages": messages,
         "temperature": 0.3,
-        "max_tokens": 500,
+        "max_tokens": 2000,
         "stream": True
     }
 
@@ -71,7 +74,8 @@ def ask_question_stream(question: str,session_id: str = "default"):
                 yield "data: 大模型服务网络异常，请稍后再试。\n\n"
                 return
 
-    # 4. 流式读取（新增一个变量记录完整回答）
+    print("开始流式输出回答...")
+    # 5. 流式读取（新增一个变量记录完整回答）
     full_answer = ""
 
     for line in resp.iter_lines():
@@ -97,18 +101,18 @@ def ask_question_stream(question: str,session_id: str = "default"):
                 print(f"解析 JSON 失败: {json_str}")
                 continue
 
-    # 5. 【核心修改】判断大模型是否输出了“无法回答”
+    # 6.判断大模型是否输出了“无法回答”
     # 如果包含这句话，直接 return，不输出参考来源
     if "根据当前文档无法回答" in full_answer:
         return
 
-    # 6.保存记忆
+    # 7.保存记忆
     if full_answer:
         history.append({"role": "user", "content": question})
         history.append({"role": "assistant", "content": full_answer})
         save_history(session_id, history)
 
-    # 7. 只有真正回答了，才拼接参考来源
+    # 8. 只有真正回答了，才拼接参考来源
     source_text = "\n\n参考来源：\n\n" + "\n\n".join(source_info)
     safe_sources = source_text.replace("\n", "\ndata: ")
     yield f"data: {safe_sources}\n\n"

@@ -199,6 +199,37 @@ async function ask() {
   let fullText = "";
   let sysHtml = "";
 
+  // --- Markdown 渲染节流器 ---
+  let isRendering = false;
+  function renderMarkdown() {
+    if (isRendering) return;
+    isRendering = true;
+
+    // 使用 requestAnimationFrame 优化渲染性能
+    requestAnimationFrame(() => {
+      let contentHtml = sysHtml;
+
+      if (fullText) {
+        // 【核心修复1】一旦有了正文，立刻清空系统提示的小黄框
+        sysHtml = "";
+        try {
+          // 尝试解析 Markdown
+          contentHtml = marked.parse(fullText);
+        } catch (e) {
+          // 【核心修复2】流式输出时可能会有未闭合的语法（比如刚打出 ** ），导致解析报错
+          // 报错时直接降级显示纯文本，保证不崩溃
+          contentHtml = fullText;
+        }
+      } else if (!sysHtml) {
+        contentHtml = "思考中...";
+      }
+
+      aiDiv.innerHTML = contentHtml;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      isRendering = false;
+    });
+  }
+
   try {
     // 根据模式切换请求的接口
     const apiUrl = mode === 'agent' ? '/api/chat/agent' : '/api/chat/rag';
@@ -229,25 +260,28 @@ async function ask() {
           if (text === '[DONE]') continue;
 
           if (text.startsWith('[SYS]')) {
-            sysHtml += `<div class="sys-status">${text.replace('[SYS] ', '')}</div>`;
+             // 这里只在没有正文的时候更新 sysHtml
+            if (!fullText) {
+               sysHtml = `<div class="sys-status">${text.replace('[SYS] ', '')}</div>`;}
           } else {
             // 过滤可能的乱码标签
             text = text.replace(/<\s*\|.*?DSML.*?\|.*?>/gs, "");
             fullText += text;
           }
 
-          // 实时渲染
-          aiDiv.innerHTML = sysHtml + (fullText ? marked.parse(fullText) : "思考中...");
-          chatBox.scrollTop = chatBox.scrollHeight;
+          // 每次收到数据，调用渲染函数（内部有节流控制，不会卡）
+          renderMarkdown();
         }
       }
     }
 
-    // 如果模型完全没生成文本
-    if (!fullText && sysHtml) {
-      aiDiv.innerHTML = sysHtml + `<div style="color:#e74c3c; margin-top:10px;">⚠️ 生成最终文本失败，请检查模型状态。</div>`;
-    } else if (!fullText && !sysHtml) {
-      aiDiv.innerHTML = "抱歉，我没有理解你的问题。";
+    // 流结束后，最后一次完整渲染（确保 Markdown 语法彻底闭合）
+    if (fullText) {
+        aiDiv.innerHTML = marked.parse(fullText);
+    } else if (sysHtml) {
+        aiDiv.innerHTML = sysHtml + `<div style="color:#e74c3c; margin-top:10px;">⚠️ 生成最终文本失败。</div>`;
+    } else {
+        aiDiv.innerHTML = "抱歉，我没有理解你的问题。";
     }
 
   } catch (err) {

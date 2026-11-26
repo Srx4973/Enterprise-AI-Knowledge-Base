@@ -75,8 +75,8 @@ def ask_agent_stream(question: str,session_id: str = "default"):
     messages = history.copy()  # 浅拷贝历史记录
 
     # 优化：将摘要和系统人设合并成一个 system 提示词
-    system_content = "你是一个严格遵循知识库的智能助手。\n当你调用 search_documents 工具时，工具会返回参考资料。你必须完全依赖参考资料进行回答。" \
-                     "\n极其重要：如果参考资料里包含了“【参考来源】”，你必须把它输出整齐，和返回的内容一一对应，不能遗漏！"
+    system_content = "你是一个全能的智能助手，请根据用户问题自主决定是否调用工具。如果调用了 search_documents，请严格基于参考资料回答；" \
+                     "若资料中无答案，直接说“根据当前文档无法回答”，严禁编造。"
     # 如果有历史摘要，追加到 system_content 后面
     current_summary = get_summary(session_id)
     if current_summary:
@@ -102,7 +102,7 @@ def ask_agent_stream(question: str,session_id: str = "default"):
     message = response_data["choices"][0]["message"]
 
     # 声明一个变量存来源
-    extracted_sources = ""
+    extracted_sources_list = []
     # 7. 如果调用工具
     if "tool_calls" in message:
         yield "data: [SYS] 正在调用工具...\n\n"
@@ -122,8 +122,13 @@ def ask_agent_stream(question: str,session_id: str = "default"):
                 # 提取参考来源
                 sources_match = re.search(r"\[SOURCES_START\](.*?)\[SOURCES_END\]", result, re.DOTALL)
                 if sources_match:
-                    extracted_sources = sources_match.group(1).strip()#group(1)只提取括号 () 里面的内容
-                    # 把参考资料返回给大模型时，把参考来源删掉，后面用代码加上
+                    # 获取纯文本来源
+                    source_text = sources_match.group(1).strip()#group(1)只提取括号 () 里面的内容
+                    #按行切分，去重，然后再加进列表
+                    for line in source_text.split("\n"):
+                        if line.strip() and line.strip() not in extracted_sources_list:
+                            extracted_sources_list.append(line.strip())
+                    # 把参考资料返回给大模型时，把参考来源删掉
                     result = result.replace(sources_match.group(0), "").strip()#group(0)：提取整个正则表达式匹配到的全部内容
             elif func_name == "list_all_documents":
                 result = list_all_documents()
@@ -171,8 +176,10 @@ def ask_agent_stream(question: str,session_id: str = "default"):
                     except:
                         continue
             # 8. 流式输出完成后，输出来源，更新记忆
-            #输出文档的参考来源
-            if extracted_sources:
+            #输出文档的参考来源,把列表拼接成字符串
+            if extracted_sources_list:
+                # 用双换行符连接，保证前端显示或替换 <br> 时是分行的
+                extracted_sources = "\n\n".join(extracted_sources_list)
                 source_text = "\n\n参考来源：\n\n" + extracted_sources
                 safe_sources = source_text.replace("\n", "\ndata: ")
                 yield f"data: {safe_sources}\n\n"

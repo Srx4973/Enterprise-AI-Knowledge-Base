@@ -22,3 +22,13 @@ def save_history(session_id: str, messages: list):
         messages = messages[-MAX_HISTORY_TURNS * 2:]
 
     redis_client.set(f"chat_history:{session_id}", json.dumps(messages), ex=3600)  # 1小时过期
+
+
+# 获取摘要
+def get_summary(session_id: str) -> str:
+    return redis_client.get(f"chat_summary:{session_id}") or ""
+
+# 保存摘要（设置过期时间）
+def save_summary(session_id: str, summary: str):
+    redis_client.set(f"chat_summary:{session_id}", summary, ex=3600)
+

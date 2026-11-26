@@ -13,10 +13,13 @@ CHROMA_PATH = os.path.join(BASE_DIR, "../chroma_db_online")
 CHROMA_COLLECTION = "pdf_docs"
 
 #api配置
-# 大模型（生成）的配置
+# 模型配置（小任务）
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 MODEL_NAME = "GLM-4-Flash-250414"
 DEEPSEEK_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+#最终模型(生成)配置
+END_MODEL = 'zai-org/GLM-5.3-Flash'
+END_URL = 'https://api.siliconflow.cn/v1/chat/completions'
 
 # 向量模型（检索）的配置
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")

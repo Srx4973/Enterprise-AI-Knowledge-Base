@@ -6,13 +6,26 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
 from app.api.routes import router
+from app.rag.retriever import build_bm25_index
+
+
+# 【新增：生命周期管理】
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动时执行：构建 BM25 索引
+    build_bm25_index()
+    yield
+    # 关闭时执行
+    print("服务关闭")
 
 # 初始化 FastAPI
 app = FastAPI(
     title="Enterprise AI Knowledge Base API",
     description="基于 RAG 与 Agent 的企业级知识库后端",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 配置 CORS（跨域资源共享）

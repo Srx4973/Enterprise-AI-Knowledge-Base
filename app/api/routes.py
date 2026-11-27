@@ -11,6 +11,7 @@ from ..core.config import celery_app, BASE_DIR
 from ..tasks.ingest import process_document_to_db
 from ..rag.generator import ask_question_stream
 from ..agent.agent_main import ask_agent_stream
+from ..rag.retriever import build_bm25_index
 
 router = APIRouter()
 
@@ -56,6 +57,14 @@ async def get_task_status(task_id: str):
         return {"state": "SUCCESS", "result": task_result.result}
     else:
         return {"state": task_result.state, "message": str(task_result.info)}
+
+
+# ===========BM25 索引重建接口=======================
+@router.post("/rebuild-bm25")
+async def rebuild_index():
+    """前端在文件上传成功后调用此接口，重建内存中的 BM25 索引"""
+    build_bm25_index()
+    return {"status": "success", "message": "BM25 索引已重建"}
 
 
 # ================= 3. 问答请求模型 =================

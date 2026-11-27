@@ -1,13 +1,15 @@
+import jieba
 import requests
+from rank_bm25 import BM25Okapi
 from chromadb import PersistentClient
 from ..core.memory import get_history
 from ..core.embedder import embedding_fn
 from ..core.config import EMBEDDING_API_KEY,RERANK_MODEL,RERANK_URL,CHROMA_PATH,DEEPSEEK_API_KEY,MODEL_NAME,DEEPSEEK_URL
 
-# 1. 连接数据库
+# 连接数据库
 client = PersistentClient(path=CHROMA_PATH)
 
-# 2. 获取集合
+# 获取集合
 collection = client.get_or_create_collection(
     name="pdf_docs",
     embedding_function=embedding_fn,
@@ -49,13 +51,87 @@ def rewrite_query(query: str, session_id: str) -> str:
 
     return query
 
-# ---------- 检索函数 ----------
-def retrieve(query, n_results):
-    results = collection.query(query_texts=[query], n_results=n_results)
-    docs = results['documents'][0]
-    metas = results['metadatas'][0]
-    distances = results['distances'][0]
-    return docs, metas, distances
+# 1. 中文分词器
+def tokenize_text(text: str):
+    return list(jieba.cut_for_search(text.lower()))
+
+
+# 2. 全局缓存（保存 BM25 索引）
+_bm25_cache = {
+    "index": None,
+    "ids": [],
+    "docs": [],
+    "metas": []
+}
+
+
+# 3. 构建索引的函数（供 main.py 启动时调用）
+def build_bm25_index():
+    global _bm25_cache
+    print("正在加载全库数据并构建 BM25 索引，请稍候...")
+    all_data = collection.get(include=["documents", "metadatas"])
+
+    if not all_data["documents"]:
+        print(" 知识库为空，跳过 BM25 索引构建")
+        return
+
+    #把上面拿到的所有 documents（文本块），逐个用 jieba 切词后的二维列表。比如 [['深度学习', '是', '...'], ['大模型', '微调', '...']]
+    tokenized_corpus = [tokenize_text(doc) for doc in all_data["documents"]]
+
+    ##BM25Okapi是 rank_bm25 库里的类,传入分词后的语料后，它在内存里建立了一个倒排索引。它返回的对象包含了每个词出现在哪些块里、频率是多少、以及该词的罕见程度（IDF）
+    _bm25_cache["index"] = BM25Okapi(tokenized_corpus)
+    _bm25_cache["ids"] = all_data["ids"]
+    _bm25_cache["docs"] = all_data["documents"]
+    _bm25_cache["metas"] = all_data["metadatas"]
+    print(f" BM25 索引构建完成，共 {len(_bm25_cache['ids'])} 个文本块！")
+
+# 4. RRF 融合算法
+def rrf_fuse(vector_ids: list, bm25_ids: list, k: int = 60):
+    scores = {}
+    # 向量检索的排名分数
+    for rank, doc_id in enumerate(vector_ids):
+        scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank + 1)
+    # BM25 检索的排名分数
+    for rank, doc_id in enumerate(bm25_ids):
+        scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank + 1)
+    # 按分数降序
+    return sorted(scores.items(), key=lambda x: x[1], reverse=True)#key:按元组的第二个元素（也就是分数）来排序
+    #scores.items()：把字典转成 [('id1', 0.03), ('id2', 0.05)]
+
+# 5. 改造后的混合检索（供 tools.py 和 generator.py 调用）
+def retrieve(query: str, n_results: int = 10):
+    # (1) 向量检索
+    vector_results = collection.query(query_texts=[query], n_results=n_results)
+    vector_ids = vector_results['ids'][0]
+
+    # (2) BM25 检索
+    bm25_result_ids = []
+    if _bm25_cache["index"]:
+        tokenized_query = tokenize_text(query)
+        bm25_scores = _bm25_cache["index"].get_scores(tokenized_query)
+        # 获取 BM25 Top N 的索引
+        top_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:n_results]
+        bm25_result_ids = [_bm25_cache["ids"][i] for i in top_indices]
+
+    # (3) 融合
+    fused_results = rrf_fuse(vector_ids, bm25_result_ids) #返回的是ID加分数,如('id1', 0.03)
+
+    # (4) 提取最终的 docs 和 metas
+    final_docs, final_metas = [], []
+    # 建立 ID 映射表方便查找
+    id_to_doc = dict(zip(_bm25_cache["ids"], _bm25_cache["docs"]))
+    id_to_meta = dict(zip(_bm25_cache["ids"], _bm25_cache["metas"]))
+
+    # 如果库里没数据（或者 BM25 没建起来），回退到纯向量
+    if not id_to_doc:
+        return vector_results['documents'][0], vector_results['metadatas'][0]
+
+    for doc_id, score in fused_results[:n_results]:
+        if doc_id in id_to_doc:
+            final_docs.append(id_to_doc[doc_id])
+            final_metas.append(id_to_meta[doc_id])
+
+    return final_docs, final_metas
 
 #---------- 重排函数 ----------
 def rerank_documents(query, docs, top_n=3):
@@ -84,14 +160,11 @@ def rerank_documents(query, docs, top_n=3):
 # -----检索、过滤、重排，拼 Prompt-----
 def build_context_and_prompt(question: str):
     # 1. 粗排：去库里拿 10 个候选块
-    docs, metas, distances = retrieve(question, n_results=10)
+    docs, metas= retrieve(question, n_results=10)
 
-    # 2. 过滤低相似度块
-    valid = [(d, m, dist) for d, m, dist in zip(docs, metas, distances) if dist < 1.5]
-    if not valid:
+    if not docs:
         return None, None
 
-    docs, metas, _ = zip(*valid)
     docs, metas = list(docs), list(metas)
 
     # 3. 精排：把这 10 个块丢给 Rerank API，挑出得分最高的 3 个
